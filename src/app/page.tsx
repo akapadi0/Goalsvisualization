@@ -7,25 +7,17 @@ import { toPng } from "html-to-image";
    1) Define TypeScript Types
 --------------------------------------------- */
 
-// The “super categories” (pages 1, 2, 3):
 type SuperCategory = "Basic needs" | "Physiological needs" | "Self-actualization";
 
-// Subcategories for each super category:
 type BasicNeedsSubcat = "Body & Health" | "Environment & Surroundings" | "Money & Finance";
 type PhysioNeedsSubcat = "Family" | "Love" | "Work" | "Friendships & Social life" | "Leisure";
 type SelfActualSubcat = "Self" | "Mindset and mood" | "Spirituality & Meaning";
 
-// Union of all possible subcategories:
-type SubCategory = 
-  BasicNeedsSubcat | 
-  PhysioNeedsSubcat | 
-  SelfActualSubcat;
+type SubCategory =
+  | BasicNeedsSubcat
+  | PhysioNeedsSubcat
+  | SelfActualSubcat;
 
-/* 
-   Full shape of your superCategories object:
-   Each super category maps to an object whose keys are subcategories 
-   and whose values are arrays of strings (the “cards”).
-*/
 interface AllSuperCategories {
   "Basic needs": Record<BasicNeedsSubcat, string[]>;
   "Physiological needs": Record<PhysioNeedsSubcat, string[]>;
@@ -33,7 +25,7 @@ interface AllSuperCategories {
 }
 
 /* ---------------------------------------------
-   2) The Data Objects (Full Lists)
+   2) Data Objects
 --------------------------------------------- */
 
 const superCategories: AllSuperCategories = {
@@ -263,18 +255,16 @@ const superCategories: AllSuperCategories = {
   }
 };
 
-/** 
- * How many cards can be selected per super category 
- */
+/* ---------------------------------------------
+   3) Config & Intro Strings
+--------------------------------------------- */
+
 const maxSelections: Record<SuperCategory, number> = {
   "Basic needs": 5,
   "Physiological needs": 4,
   "Self-actualization": 2
 };
 
-/** 
- * Short intros for pages 1–3 
- */
 const pageIntros: Record<SuperCategory, string> = {
   "Basic needs":
     "Basic Needs are foundational. They include aspects like Body & Health, Environment & Surroundings, and Money & Finance. Focusing on these helps ensure your day-to-day stability and security.",
@@ -285,29 +275,13 @@ const pageIntros: Record<SuperCategory, string> = {
 };
 
 /* ---------------------------------------------
-   3) The React Component
+   4) Main Component
 --------------------------------------------- */
 
 export default function CardGame() {
-  /**
-   * page = 0 => Intro
-   * page = 1 => Basic needs
-   * page = 2 => Physiological needs
-   * page = 3 => Self-actualization
-   * page = 4 => Results
-   */
   const [page, setPage] = useState<number>(0);
-
-  /**
-   * selectedCards will map a subcategory (string key) to an array of selected card strings.
-   * For example: { "Body & Health": ["Adopt a healthier diet"], "Family": [...] }
-   */
   const [selectedCards, setSelectedCards] = useState<Partial<Record<SubCategory, string[]>>>({});
 
-  /**
-   * Collapsed by default => set all to false
-   * Subcategory => boolean
-   */
   const defaultExpandedState: Record<SubCategory, boolean> = {
     "Body & Health": false,
     "Environment & Surroundings": false,
@@ -326,33 +300,33 @@ export default function CardGame() {
     ...defaultExpandedState
   });
 
-  // ------------------ NAVIGATION ------------------
+  // Go forward/back among pages
   const goToNextPage = () => setPage((prev) => prev + 1);
   const goToPreviousPage = () => setPage((prev) => prev - 1);
 
-  // Re-collapse categories each time we land on pages 1–3
+  // Collapse subcategories on each new page
   useEffect(() => {
     if (page >= 1 && page <= 3) {
       setExpandedCategories({ ...defaultExpandedState });
     }
   }, [page]);
 
-  // ------------------ UTILITY FUNCTIONS ------------------
-
+  // Convert page # to super category
   function getSuperCategory(): SuperCategory {
-    // page=1 => "Basic needs", page=2 => "Physiological needs", page=3 => "Self-actualization"
     const keys = Object.keys(superCategories) as SuperCategory[];
     return keys[page - 1];
   }
 
-  function getTotalSelectedInSuperCategory(superCategory: SuperCategory): number {
-    const subCats = Object.keys(superCategories[superCategory]) as SubCategory[];
+  // Count how many are selected in this super category
+  function getTotalSelectedInSuperCategory(superCat: SuperCategory): number {
+    const subCats = Object.keys(superCategories[superCat]) as SubCategory[];
     return subCats.reduce((sum, subCat) => {
       const arr = selectedCards[subCat] || [];
       return sum + arr.length;
     }, 0);
   }
 
+  // Toggle one card
   function toggleCardSelection(category: SubCategory, card: string) {
     const currentSuperCategory = getSuperCategory();
     const limit = maxSelections[currentSuperCategory];
@@ -362,13 +336,11 @@ export default function CardGame() {
     const isSelected = currentSelection.includes(card);
 
     if (isSelected) {
-      // remove
       setSelectedCards({
         ...selectedCards,
         [category]: currentSelection.filter((c) => c !== card)
       });
     } else {
-      // add
       if (totalSelected < limit) {
         setSelectedCards({
           ...selectedCards,
@@ -382,6 +354,7 @@ export default function CardGame() {
     }
   }
 
+  // Expand/collapse category
   function toggleCategory(category: SubCategory) {
     setExpandedCategories((prev) => ({
       ...prev,
@@ -389,29 +362,31 @@ export default function CardGame() {
     }));
   }
 
-  function getSelectedCardsByCategory(superCategory: SuperCategory): string[] {
-    const subCats = Object.keys(superCategories[superCategory]) as SubCategory[];
+  // Return selected cards for a single super cat
+  function getSelectedCardsByCategory(superCat: SuperCategory): string[] {
+    const subCats = Object.keys(superCategories[superCat]) as SubCategory[];
     return subCats.flatMap((sc) => selectedCards[sc] || []);
   }
 
-  // ------------------ CLEAR SELECTIONS ------------------
+  // Clear current category
   function clearCurrentCategory() {
     const currentSuperCategory = getSuperCategory();
     if (!currentSuperCategory) return;
 
-    const newSelectedCards = { ...selectedCards };
+    const newSelected = { ...selectedCards };
     const subCats = Object.keys(superCategories[currentSuperCategory]) as SubCategory[];
     subCats.forEach((subCat) => {
-      newSelectedCards[subCat] = [];
+      newSelected[subCat] = [];
     });
-    setSelectedCards(newSelectedCards);
+    setSelectedCards(newSelected);
   }
 
+  // Clear all
   function clearAllSelections() {
     setSelectedCards({});
   }
 
-  // ------------------ SAVE PYRAMID AS IMAGE ------------------
+  // Capture the pyramid as an image
   function savePyramidAsImage() {
     const pyramidRef = document.getElementById("pyramid");
     if (!pyramidRef) {
@@ -419,17 +394,19 @@ export default function CardGame() {
       return;
     }
 
-    // Scroll up to ensure the entire container is visible
-    window.scrollTo(0, 0);
+    // Scroll so the bottom is in view
+    pyramidRef.scrollIntoView({ behavior: "auto", block: "end" });
 
     setTimeout(() => {
-      // measure boundingRect to capture the full layout
       const rect = pyramidRef.getBoundingClientRect();
+      const targetWidth = 900;
+      const aspectRatio = rect.height / rect.width;
+      const targetHeight = Math.round(targetWidth * aspectRatio);
 
       toPng(pyramidRef, {
-        width: Math.ceil(rect.width),
-        height: Math.ceil(rect.height),
-        pixelRatio: 2,
+        canvasWidth: targetWidth,
+        canvasHeight: targetHeight,
+        pixelRatio: 1.0,
         style: {
           backgroundColor: "#000",
           overflow: "visible"
@@ -443,14 +420,14 @@ export default function CardGame() {
         })
         .catch((err) => {
           console.error("Failed to generate image:", err);
+          alert("Failed to generate the image. Please try again.");
         });
-    }, 1500); // Wait 1.5s for layout to stabilize
+    }, 1000);
   }
 
-  // ------------------ RENDER ------------------
   return (
     <div style={styles.container}>
-      {/* PAGE 0: Intro */}
+      {/* Page 0: Intro */}
       {page === 0 && (
         <div style={styles.introPage}>
           <div style={styles.logoContainer}>
@@ -472,7 +449,7 @@ export default function CardGame() {
         </div>
       )}
 
-      {/* PAGE 1-3: Category selection pages */}
+      {/* Pages 1–3 */}
       {page > 0 && page < 4 && (
         <div style={styles.categoryPage}>
           <h1 style={styles.pageTitle}>{getSuperCategory()}</h1>
@@ -540,17 +517,16 @@ export default function CardGame() {
         </div>
       )}
 
-      {/* PAGE 4: Results (the left‐label “pyramid”) */}
+      {/* Page 4: Results */}
       {page === 4 && (
         <div style={styles.resultsPage}>
-          <h2>Your Priorities Pyramid</h2>
-          <p>Here is your pyramid visualization:</p>
+          <h2>Here is your Priorities Pyramid</h2>
 
           <div id="pyramid" style={styles.pyramidContainer}>
-            {/* Self-actualization row (top) */}
-            <div style={styles.pyramidRow}>
-              <div style={styles.pyramidLabel}>Self-actualization</div>
-              <div style={{ ...styles.pyramidLevel, justifyContent: "center", marginTop: "0px" }}>
+            {/* Self-actualization */}
+            <div style={styles.rowSection}>
+              <h3 style={styles.rowLabel}>Self-actualization</h3>
+              <div style={styles.cardsRow}>
                 {getSelectedCardsByCategory("Self-actualization").map((card, i) => (
                   <div key={`self-${i}`} style={styles.pyramidCard}>
                     {card}
@@ -559,10 +535,10 @@ export default function CardGame() {
               </div>
             </div>
 
-            {/* Physiological needs row (middle) */}
-            <div style={styles.pyramidRow}>
-              <div style={styles.pyramidLabel}>Physiological needs</div>
-              <div style={{ ...styles.pyramidLevel, justifyContent: "center", marginTop: "20px" }}>
+            {/* Physiological needs */}
+            <div style={styles.rowSection}>
+              <h3 style={styles.rowLabel}>Physiological needs</h3>
+              <div style={styles.cardsRow}>
                 {getSelectedCardsByCategory("Physiological needs").map((card, i) => (
                   <div key={`physio-${i}`} style={styles.pyramidCard}>
                     {card}
@@ -571,10 +547,10 @@ export default function CardGame() {
               </div>
             </div>
 
-            {/* Basic needs row (bottom) */}
-            <div style={styles.pyramidRow}>
-              <div style={styles.pyramidLabel}>Basic needs</div>
-              <div style={{ ...styles.pyramidLevel, justifyContent: "center", marginTop: "20px" }}>
+            {/* Basic needs */}
+            <div style={styles.rowSection}>
+              <h3 style={styles.rowLabel}>Basic needs</h3>
+              <div style={styles.cardsRow}>
                 {getSelectedCardsByCategory("Basic needs").map((card, i) => (
                   <div key={`basic-${i}`} style={styles.pyramidCard}>
                     {card}
@@ -585,10 +561,10 @@ export default function CardGame() {
           </div>
 
           <div style={styles.resultsButtons}>
-            <button style={{ ...styles.button, marginRight: "20px" }} onClick={savePyramidAsImage}>
+            <button style={{ ...styles.button, margin: "0 10px" }} onClick={savePyramidAsImage}>
               Save as Image
             </button>
-            <button style={styles.button} onClick={() => setPage(0)}>
+            <button style={{ ...styles.button, margin: "0 10px" }} onClick={() => setPage(0)}>
               Restart
             </button>
           </div>
@@ -599,7 +575,7 @@ export default function CardGame() {
 }
 
 /* ---------------------------------------------
-   4) Styles with TypeScript
+   5) Styles
 --------------------------------------------- */
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -694,43 +670,45 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "1rem"
   },
   resultsPage: {
-    padding: "20px"
+    padding: "20px",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center"
   },
+  // We fix the width at 900 and anchor on the left with marginLeft,
+  // but we'll center the row sections within it.
   pyramidContainer: {
-    margin: "20px auto",
+    marginTop: "20px",
     padding: "20px",
     backgroundColor: "#000",
     borderRadius: "8px",
-    width: "80%",
-    maxWidth: "1000px",
+    width: "900px", // same as the targetWidth in savePyramidAsImage
     boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+    marginLeft: "30px",  // slight indent from the left edge
     overflow: "visible",
     display: "flex",
     flexDirection: "column",
-    gap: "15px",
-    alignItems: "flex-start" // So the label is flush left
+    gap: "35px"
+    // No alignItems here => we'll do it in rowSection
   },
-  // Each row: label on left + cards on the right
-  pyramidRow: {
+  rowSection: {
     display: "flex",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: "10px",
+    flexDirection: "column",
+    alignItems: "center", // center label + row
     width: "100%"
   },
-  pyramidLabel: {
-    width: "150px", // Adjust as needed
+  rowLabel: {
+    fontSize: "1.1rem",
     color: "#FFD5E5",
-    fontWeight: "bold",
-    marginTop: "20px",
-    justifyContent: "center",
-    textAlign: "right"
+    marginBottom: "10px",
+    textAlign: "center"
   },
-  pyramidLevel: {
+  cardsRow: {
     display: "flex",
     flexWrap: "wrap",
-    gap: "10px",
-    flex: 1 // let the row expand
+    justifyContent: "center",
+    gap: "10px"
   },
   pyramidCard: {
     border: "1px solid #D47392",
@@ -749,8 +727,9 @@ const styles: Record<string, CSSProperties> = {
     color: "#000"
   },
   resultsButtons: {
-    marginTop: "20px",
+    marginTop: "40px",
     display: "flex",
-    justifyContent: "center"
+    justifyContent: "center",
+    width: "100%"
   }
 };
